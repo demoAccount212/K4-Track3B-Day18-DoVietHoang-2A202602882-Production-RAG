@@ -12,7 +12,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 USE_GEMINI = bool(GEMINI_API_KEY) and not OPENAI_API_KEY
 
 # --- LLM Model ---
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 OPENAI_MODEL = "gpt-4o-mini"
 
 # --- Qdrant ---

@@ -103,6 +103,20 @@ def evaluate_ragas(questions: list[str], answers: list[str],
                 "context_precision": 0.0, "context_recall": 0.0, "per_question": []}
 
 
+def _to_serializable(obj):
+    """Convert numpy types to native Python types for JSON serialization."""
+    import numpy as np
+    if isinstance(obj, (np.integer, np.floating)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {k: _to_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_serializable(v) for v in obj]
+    return obj
+
+
 def failure_analysis(eval_results: list[EvalResult], bottom_n: int = 10) -> list[dict]:
     """Analyze bottom-N worst questions using Diagnostic Tree."""
     diagnostic_tree = {
@@ -119,10 +133,10 @@ def failure_analysis(eval_results: list[EvalResult], bottom_n: int = 10) -> list
     scored = []
     for r in eval_results:
         metrics = {
-            "faithfulness": r.faithfulness,
-            "answer_relevancy": r.answer_relevancy,
-            "context_precision": r.context_precision,
-            "context_recall": r.context_recall,
+            "faithfulness": float(r.faithfulness),
+            "answer_relevancy": float(r.answer_relevancy),
+            "context_precision": float(r.context_precision),
+            "context_recall": float(r.context_recall),
         }
         avg_score = sum(metrics.values()) / 4
         worst_metric = min(metrics, key=metrics.get)
@@ -134,9 +148,9 @@ def failure_analysis(eval_results: list[EvalResult], bottom_n: int = 10) -> list
             "answer": r.answer,
             "contexts": r.contexts,
             "ground_truth": r.ground_truth,
-            "avg_score": avg_score,
+            "avg_score": float(avg_score),
             "worst_metric": worst_metric,
-            "worst_score": worst_score,
+            "worst_score": float(worst_score),
             "diagnosis": diagnosis,
             "suggested_fix": suggested_fix,
             "metrics": metrics,
@@ -144,7 +158,7 @@ def failure_analysis(eval_results: list[EvalResult], bottom_n: int = 10) -> list
 
     # Sort by avg_score ascending (worst first) and take bottom_n
     scored.sort(key=lambda x: x["avg_score"])
-    return scored[:bottom_n]
+    return _to_serializable(scored[:bottom_n])
 
 
 def save_report(results: dict, failures: list[dict], path: str = "reports/ragas_report.json"):
@@ -153,12 +167,12 @@ def save_report(results: dict, failures: list[dict], path: str = "reports/ragas_
     if parent_dir:
         os.makedirs(parent_dir, exist_ok=True)
     report = {
-        "aggregate": {k: v for k, v in results.items() if k != "per_question"},
+        "aggregate": {k: float(v) if hasattr(v, '__float__') else v for k, v in results.items() if k != "per_question"},
         "num_questions": len(results.get("per_question", [])),
         "failures": failures,
     }
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(report, f, ensure_ascii=False, indent=2)
+        json.dump(_to_serializable(report), f, ensure_ascii=False, indent=2)
     print(f"Report saved to {path}")
 
 
