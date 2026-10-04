@@ -10,5 +10,6 @@ langchain-community>=0.2,<0.3
 langchain-openai>=0.1,<0.2
 datasets>=2.19
 openai>=1.30
+google-generativeai>=0.7
 pytest>=8.0
 ruff>=0.4

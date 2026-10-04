@@ -7,6 +7,13 @@ load_dotenv()
 
 # --- API Keys ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+# Use Gemini if available, else OpenAI
+USE_GEMINI = bool(GEMINI_API_KEY) and not OPENAI_API_KEY
+
+# --- LLM Model ---
+GEMINI_MODEL = "gemini-1.5-flash"
+OPENAI_MODEL = "gpt-4o-mini"
 
 # --- Qdrant ---
 QDRANT_HOST = "localhost"

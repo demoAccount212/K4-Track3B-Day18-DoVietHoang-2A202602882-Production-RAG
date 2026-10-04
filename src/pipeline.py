@@ -15,7 +15,46 @@ from src.m2_search import HybridSearch
 from src.m3_rerank import CrossEncoderReranker
 from src.m4_eval import load_test_set, evaluate_ragas, failure_analysis, save_report
 from src.m5_enrichment import enrich_chunks
-from config import RERANK_TOP_K
+from config import RERANK_TOP_K, OPENAI_API_KEY, GEMINI_API_KEY, USE_GEMINI, GEMINI_MODEL, OPENAI_MODEL
+
+
+def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 400) -> str:
+    """Call LLM (Gemini or OpenAI) with given prompts."""
+    if USE_GEMINI and GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel(GEMINI_MODEL)
+            full_prompt = f"{system_prompt}\n\n{user_prompt}"
+            response = model.generate_content(
+                full_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=max_tokens,
+                    temperature=0.1,
+                )
+            )
+            return response.text.strip()
+        except Exception as e:
+            print(f"  ⚠️  Gemini call failed: {e}")
+
+    if OPENAI_API_KEY:
+        try:
+            from openai import OpenAI
+            client = OpenAI()
+            resp = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=0.1,
+            )
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"  ⚠️  OpenAI call failed: {e}")
+
+    return ""
 
 
 def build_pipeline():
@@ -68,22 +107,15 @@ def run_query(query: str, search: HybridSearch, reranker: CrossEncoderReranker) 
     reranked = reranker.rerank(query, docs, top_k=RERANK_TOP_K)
     contexts = [r.text for r in reranked] if reranked else [r.text for r in results[:3]]
 
-    from config import OPENAI_API_KEY
-    if OPENAI_API_KEY and contexts:
-        try:
-            from openai import OpenAI
-            client = OpenAI()
-            context_str = "\n\n".join(contexts)
-            resp = client.chat.completions.create(model="gpt-4o-mini", messages=[
-                {"role": "system", "content": "Trả lời CHỈ dựa trên context. Nếu không có → nói 'Không tìm thấy.'"},
-                {"role": "user", "content": f"Context:\n{context_str}\n\nCâu hỏi: {query}"},
-            ])
-            answer = resp.choices[0].message.content
-        except Exception as e:
-            print(f"  ⚠️  LLM generation failed: {e}", flush=True)
+    system_prompt = "Trả lời CHỈ dựa trên context. Nếu không có → nói 'Không tìm thấy.'"
+    if contexts:
+        context_str = "\n\n".join(contexts)
+        user_prompt = f"Context:\n{context_str}\n\nCâu hỏi: {query}"
+        answer = _call_llm(system_prompt, user_prompt)
+        if not answer:
             answer = contexts[0]
     else:
-        answer = contexts[0] if contexts else "Không tìm thấy thông tin."
+        answer = "Không tìm thấy thông tin."
     return answer, contexts
 
 
