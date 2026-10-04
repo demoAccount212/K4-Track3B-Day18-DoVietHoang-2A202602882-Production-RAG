@@ -8,7 +8,7 @@ Làm giàu chunks TRƯỚC khi embed: Summarize, HyQA, Contextual Prepend, Auto 
 Test: pytest tests/test_m5.py
 """
 
-import os, sys, json
+import os, sys, json, time, re
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
@@ -30,57 +30,100 @@ class EnrichedChunk:
     method: str  # "contextual", "summary", "hyqa", "full"
 
 
+# ─── Rate Limiter for Free Tier ────────────────────────────
+
+_last_call_time = 0.0
+_min_interval = 4.5  # seconds between calls (15 RPM = 4 sec, add buffer)
+
+
+def _rate_limit():
+    """Enforce minimum interval between API calls."""
+    global _last_call_time
+    elapsed = time.time() - _last_call_time
+    if elapsed < _min_interval:
+        time.sleep(_min_interval - elapsed)
+    _last_call_time = time.time()
+
+
+def _parse_retry_delay(error_msg: str) -> float:
+    """Extract retry delay from error message (e.g., 'Please retry in 22.36s')."""
+    match = re.search(r'retry in\s+([\d.]+)\s*s', error_msg, re.IGNORECASE)
+    if match:
+        return float(match.group(1)) + 1  # add 1 second buffer
+    return 0.0
+
+
 def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 400, expect_json: bool = False) -> str | dict:
-    """Call LLM (Gemini or OpenAI) with given prompts."""
-    if USE_GEMINI and GEMINI_API_KEY:
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel(GEMINI_MODEL)
-            
-            full_prompt = f"{system_prompt}\n\n{user_prompt}"
-            response = model.generate_content(
-                full_prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=max_tokens,
+    """Call LLM (Gemini or OpenAI) with rate limiting and retry logic."""
+    max_retries = 5
+    base_delay = 5.0
+    
+    for attempt in range(max_retries):
+        _rate_limit()
+        
+        if USE_GEMINI and GEMINI_API_KEY:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=GEMINI_API_KEY)
+                model = genai.GenerativeModel(GEMINI_MODEL)
+                
+                full_prompt = f"{system_prompt}\n\n{user_prompt}"
+                response = model.generate_content(
+                    full_prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        max_output_tokens=max_tokens,
+                        temperature=0.1,
+                    )
+                )
+                text = response.text.strip()
+                if expect_json:
+                    json_match = re.search(r'\{.*\}', text, re.DOTALL)
+                    if json_match:
+                        return json.loads(json_match.group())
+                    return json.loads(text)
+                return text
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
+                    retry_delay = _parse_retry_delay(error_msg)
+                    if retry_delay == 0:
+                        retry_delay = base_delay * (2 ** attempt)  # exponential backoff
+                    print(f"  ⏳ Rate limited (attempt {attempt+1}/{max_retries}), waiting {retry_delay:.1f}s...")
+                    time.sleep(retry_delay)
+                    continue
+                print(f"  ⚠️  Gemini call failed: {e}")
+        
+        if OPENAI_API_KEY:
+            try:
+                from openai import OpenAI
+                client = OpenAI()
+                resp = client.chat.completions.create(
+                    model=OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    max_tokens=max_tokens,
                     temperature=0.1,
                 )
-            )
-            text = response.text.strip()
-            if expect_json:
-                # Try to extract JSON from response
-                import re
-                json_match = re.search(r'\{.*\}', text, re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
-                return json.loads(text)
-            return text
-        except Exception as e:
-            print(f"  ⚠️  Gemini call failed: {e}")
-    
-    if OPENAI_API_KEY:
-        try:
-            from openai import OpenAI
-            client = OpenAI()
-            resp = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                max_tokens=max_tokens,
-                temperature=0.1,
-            )
-            text = resp.choices[0].message.content.strip()
-            if expect_json:
-                import re
-                json_match = re.search(r'\{.*\}', text, re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
-                return json.loads(text)
-            return text
-        except Exception as e:
-            print(f"  ⚠️  OpenAI call failed: {e}")
+                text = resp.choices[0].message.content.strip()
+                if expect_json:
+                    json_match = re.search(r'\{.*\}', text, re.DOTALL)
+                    if json_match:
+                        return json.loads(json_match.group())
+                    return json.loads(text)
+                return text
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "rate" in error_msg.lower():
+                    retry_delay = base_delay * (2 ** attempt)
+                    print(f"  ⏳ Rate limited (attempt {attempt+1}/{max_retries}), waiting {retry_delay:.1f}s...")
+                    time.sleep(retry_delay)
+                    continue
+                print(f"  ⚠️  OpenAI call failed: {e}")
+        
+        # If we reach here, no API available or non-retryable error
+        break
     
     return "" if not expect_json else {}
 
