@@ -37,20 +37,49 @@ def evaluate_ragas(questions: list[str], answers: list[str],
     try:
         from ragas import evaluate
         from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
+        from ragas.embeddings import HuggingfaceEmbeddings
         from datasets import Dataset
+
+        # Use local embeddings to avoid OpenAI requirement
+        embeddings = HuggingfaceEmbeddings(model_name="BAAI/bge-m3")
 
         # Try to get LLM for RAGAS
         llm = None
         if USE_GEMINI and GEMINI_API_KEY:
             try:
                 from langchain_google_genai import ChatGoogleGenerativeAI
-                llm = ChatGoogleGenerativeAI(
+                from google.generativeai.types import GenerationConfig
+                from typing import Optional, List, Dict, Any
+                
+                # Subclass to override _prepare_params and exclude temperature
+                class CustomChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
+                    def _prepare_params(
+                        self,
+                        stop: Optional[List[str]],
+                        generation_config: Optional[Dict[str, Any]] = None,
+                    ) -> GenerationConfig:
+                        gen_config = {
+                            k: v
+                            for k, v in {
+                                "candidate_count": self.n,
+                                # Skip temperature entirely
+                                "stop_sequences": stop,
+                                "max_output_tokens": self.max_output_tokens,
+                                "top_k": self.top_k,
+                                "top_p": self.top_p,
+                            }.items()
+                            if v is not None
+                        }
+                        if generation_config:
+                            gen_config = {**gen_config, **generation_config}
+                        return GenerationConfig(**gen_config)
+                
+                llm = CustomChatGoogleGenerativeAI(
                     model=GEMINI_MODEL,
                     google_api_key=GEMINI_API_KEY,
-                    temperature=0.1,
                 )
-            except Exception:
-                pass  # Fall back to OpenAI or default
+            except Exception as e:
+                print(f"  ⚠️  Failed to init Gemini LLM: {e}")
         
         if llm is None and OPENAI_API_KEY:
             try:
@@ -60,26 +89,28 @@ def evaluate_ragas(questions: list[str], answers: list[str],
                     openai_api_key=OPENAI_API_KEY,
                     temperature=0.1,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  ⚠️  Failed to init OpenAI LLM: {e}")
 
         dataset = Dataset.from_dict({
             "question": questions, "answer": answers,
             "contexts": contexts, "ground_truth": ground_truths,
         })
         
-        # Configure metrics to use our LLM if available
+        # Configure metrics to use our LLM and embeddings
         if llm:
             result = evaluate(
                 dataset, 
                 metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
-                llm=llm
+                llm=llm,
+                embeddings=embeddings
             )
         else:
-            # Let RAGAS use its default (requires OPENAI_API_KEY env var)
+            # Use embeddings only, let RAGAS use default LLM (will fail if no OpenAI)
             result = evaluate(
                 dataset, 
-                metrics=[faithfulness, answer_relevancy, context_precision, context_recall]
+                metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
+                embeddings=embeddings
             )
         df = result.to_pandas()
         per_question = [EvalResult(question=row["question"], answer=row["answer"],
