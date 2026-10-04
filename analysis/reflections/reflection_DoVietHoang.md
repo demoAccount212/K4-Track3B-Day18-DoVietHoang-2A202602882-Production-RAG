@@ -1,6 +1,6 @@
 # Individual Reflection — Lab 18: Production RAG
 
-**Họ và tên:** Đỗ Việt Hoàng
+**Họ và tên:** Do Viet Hoang  
 **Khóa:** K4 - Track 3B  
 **Ngày hoàn thành:** 2026-10-05
 
@@ -53,7 +53,7 @@ Dựa trên những kỹ thuật đã học và thực hành, lập kế hoạch
 
 #### 2. Kế hoạch cải tiến
 1. **Chunking strategy:** **Hierarchical** (parent 2048, child 256) — vì tài liệu HR có cấu trúc phân cấp rõ (chương → điều → khoản); retrieve child tìm chính xác đoạn → return parent cho context đầy đủ
-2. **Search retrieval:** **Hybrid BM25 + Dense + RRF** — BM25 bắt từ khóa chính xác (mã 정책, số điều); Dense bắt ý nghĩa (semantic); RRF fuse không cần tune weight
+2. **Search retrieval:** **Hybrid BM25 + Dense + RRF** — BM25 bắt từ khóa chính xác (mã policy, số điều); Dense bắt ý nghĩa (semantic); RRF fuse không cần tune weight
 3. **Reranking:** **Có dùng bge-reranker-v2-m3** — rerank top-20 → top-3; latency ~200ms acceptable cho HR internal tool; tăng precision đáng kể cho câu hỏi tra cứu cụ thể
 4. **Evaluation:** **RAGAS 4 metrics + custom metrics** — faithfulness (giảm hallucination), context_recall (đảm bảo retrieval đủ), thêm metric custom: "policy_accuracy" (check số ngày, điều khoản đúng không)
 5. **Enrichment:** **Combined mode (_enrich_single_call)** — 1 call/chunk: summary (giảm noise embedding), HyQA questions (bridge vocabulary gap), contextual prepend (giảm retrieval failure 49%), auto metadata (filter category: leave/salary/it/safety)

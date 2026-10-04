@@ -5,71 +5,71 @@
 
 ---
 
-## RAGAS Scores
+## Điểm số RAGAS
 
 | Metric | Naive Baseline | Production | Δ |
 |--------|---------------|------------|---|
-| Faithfulness | N/A (no API key) | N/A (no API key) | N/A |
-| Answer Relevancy | N/A (no API key) | N/A (no API key) | N/A |
-| Context Precision | N/A (no API key) | N/A (no API key) | N/A |
-| Context Recall | N/A (no API key) | N/A (no API key) | N/A |
+| Faithfulness | N/A (chưa có API key) | N/A (chưa có API key) | N/A |
+| Answer Relevancy | N/A (chưa có API key) | N/A (chưa có API key) | N/A |
+| Context Precision | N/A (chưa có API key) | N/A (chưa có API key) | N/A |
+| Context Recall | N/A (chưa có API key) | N/A (chưa có API key) | N/A |
 
-> **Note:** Scores are N/A because RAGAS evaluation requires an LLM API key (OpenAI or Gemini). The pipeline ran without API key using extractive fallbacks for enrichment and returned empty answers for LLM generation. Once you obtain an API key, run `python main.py` to generate valid scores and update this table.
+> **Lưu ý:** Các điểm là N/A vì RAGAS evaluation yêu cầu LLM API key (OpenAI hoặc Gemini). Pipeline chạy không có API key dùng extractive fallback cho enrichment và trả về empty answers cho LLM generation. Khi có API key, chạy `python main.py` để sinh điểm thực và cập nhật bảng này.
 
 ---
 
-## Bottom-5 Failures (Template — Fill After Running With API Key)
+## 5 Failures tồi nhất (Template — Điền sau khi chạy có API key)
 
 ### #1
-- **Question:** [Copy from test_set.json]
-- **Expected:** [ground_truth from test_set.json]
-- **Got:** [answer from pipeline]
+- **Question:** [Copy từ test_set.json]
+- **Expected:** [ground_truth từ test_set.json]
+- **Got:** [answer từ pipeline]
 - **Worst metric:** [faithfulness / answer_relevancy / context_precision / context_recall]
 - **Error Tree:** Output sai → Context đúng? → Query OK? → 
-- **Root cause:** [Based on Diagnostic Tree mapping]
-- **Suggested fix:** [From failure_analysis() suggested_fix]
+- **Root cause:** [Dựa trên Diagnostic Tree mapping]
+- **Suggested fix:** [Từ failure_analysis() suggested_fix]
 
 ### #2
-- **Question:** [Copy from test_set.json]
-- **Expected:** [ground_truth from test_set.json]
-- **Got:** [answer from pipeline]
+- **Question:** [Copy từ test_set.json]
+- **Expected:** [ground_truth từ test_set.json]
+- **Got:** [answer từ pipeline]
 - **Worst metric:** [faithfulness / answer_relevancy / context_precision / context_recall]
 - **Error Tree:** Output sai → Context đúng? → Query OK? → 
-- **Root cause:** [Based on Diagnostic Tree mapping]
-- **Suggested fix:** [From failure_analysis() suggested_fix]
+- **Root cause:** [Dựa trên Diagnostic Tree mapping]
+- **Suggested fix:** [Từ failure_analysis() suggested_fix]
 
 ### #3
-- **Question:** [Copy from test_set.json]
-- **Expected:** [ground_truth from test_set.json]
-- **Got:** [answer from pipeline]
+- **Question:** [Copy từ test_set.json]
+- **Expected:** [ground_truth từ test_set.json]
+- **Got:** [answer từ pipeline]
 - **Worst metric:** [faithfulness / answer_relevancy / context_precision / context_recall]
 - **Error Tree:** Output sai → Context đúng? → Query OK? → 
-- **Root cause:** [Based on Diagnostic Tree mapping]
-- **Suggested fix:** [From failure_analysis() suggested_fix]
+- **Root cause:** [Dựa trên Diagnostic Tree mapping]
+- **Suggested fix:** [Từ failure_analysis() suggested_fix]
 
 ### #4
-- **Question:** [Copy from test_set.json]
-- **Expected:** [ground_truth from test_set.json]
-- **Got:** [answer from pipeline]
+- **Question:** [Copy từ test_set.json]
+- **Expected:** [ground_truth từ test_set.json]
+- **Got:** [answer từ pipeline]
 - **Worst metric:** [faithfulness / answer_relevancy / context_precision / context_recall]
 - **Error Tree:** Output sai → Context đúng? → Query OK? → 
-- **Root cause:** [Based on Diagnostic Tree mapping]
-- **Suggested fix:** [From failure_analysis() suggested_fix]
+- **Root cause:** [Dựa trên Diagnostic Tree mapping]
+- **Suggested fix:** [Từ failure_analysis() suggested_fix]
 
 ### #5
-- **Question:** [Copy from test_set.json]
-- **Expected:** [ground_truth from test_set.json]
-- **Got:** [answer from pipeline]
+- **Question:** [Copy từ test_set.json]
+- **Expected:** [ground_truth từ test_set.json]
+- **Got:** [answer từ pipeline]
 - **Worst metric:** [faithfulness / answer_relevancy / context_precision / context_recall]
 - **Error Tree:** Output sai → Context đúng? → Query OK? → 
-- **Root cause:** [Based on Diagnostic Tree mapping]
-- **Suggested fix:** [From failure_analysis() suggested_fix]
+- **Root cause:** [Dựa trên Diagnostic Tree mapping]
+- **Suggested fix:** [Từ failure_analysis() suggested_fix]
 
 ---
 
-## Test Set Reference (20 Questions)
+## Bộ test tham chiếu (20 câu hỏi)
 
-| # | Question | Ground Truth |
+| # | Câu hỏi | Ground Truth |
 |---|----------|--------------|
 | 1 | Nhân viên được nghỉ bao nhiêu ngày khi kết hôn? | 3 ngày làm việc có lương |
 | 2 | Bảo hiểm sức khỏe PVI có hạn mức bao nhiêu cho nhân viên? | 200.000.000 VNĐ/năm |
@@ -96,7 +96,7 @@
 
 ## Case Study (cho presentation)
 
-**Question chọn phân tích:** [Chọn 1 câu hỏi từ bottom-5 để phân tích sâu]
+**Câu hỏi chọn phân tích:** [Chọn 1 câu hỏi từ bottom-5 để phân tích sâu]
 
 **Error Tree walkthrough:**
 1. Output đúng? → [Yes/No + evidence]
