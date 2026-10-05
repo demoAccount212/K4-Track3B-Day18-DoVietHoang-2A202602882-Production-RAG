@@ -10,7 +10,7 @@ if hasattr(sys.stderr, "reconfigure"):
 from dataclasses import dataclass
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import TEST_SET_PATH, OPENAI_API_KEY, GEMINI_API_KEY, USE_GEMINI, GEMINI_MODEL, OPENAI_MODEL
+from config import TEST_SET_PATH
 
 
 @dataclass
@@ -39,48 +39,12 @@ def evaluate_ragas(questions: list[str], answers: list[str],
         from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
         from datasets import Dataset
 
-        # Try to get LLM for RAGAS
-        llm = None
-        if USE_GEMINI and GEMINI_API_KEY:
-            try:
-                from langchain_google_genai import ChatGoogleGenerativeAI
-                llm = ChatGoogleGenerativeAI(
-                    model=GEMINI_MODEL,
-                    google_api_key=GEMINI_API_KEY,
-                    temperature=0.1,
-                )
-            except Exception:
-                pass  # Fall back to OpenAI or default
-        
-        if llm is None and OPENAI_API_KEY:
-            try:
-                from langchain_openai import ChatOpenAI
-                llm = ChatOpenAI(
-                    model=OPENAI_MODEL,
-                    openai_api_key=OPENAI_API_KEY,
-                    temperature=0.1,
-                )
-            except Exception:
-                pass
-
         dataset = Dataset.from_dict({
             "question": questions, "answer": answers,
             "contexts": contexts, "ground_truth": ground_truths,
         })
-        
-        # Configure metrics to use our LLM if available
-        if llm:
-            result = evaluate(
-                dataset, 
-                metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
-                llm=llm
-            )
-        else:
-            # Let RAGAS use its default (requires OPENAI_API_KEY env var)
-            result = evaluate(
-                dataset, 
-                metrics=[faithfulness, answer_relevancy, context_precision, context_recall]
-            )
+        result = evaluate(dataset, metrics=[faithfulness, answer_relevancy,
+                                            context_precision, context_recall])
         df = result.to_pandas()
         per_question = [EvalResult(question=row["question"], answer=row["answer"],
             contexts=row["contexts"], ground_truth=row["ground_truth"],
