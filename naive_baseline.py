@@ -5,7 +5,7 @@ Basic = paragraph chunking + dense-only search (không hybrid, không rerank, kh
 Đây là RAG đã học ở buổi trước — hôm nay sẽ cải thiện từng bước.
 """
 
-import sys, os, time, re
+import sys, os, time
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
@@ -19,87 +19,42 @@ from src.m4_eval import load_test_set, evaluate_ragas, save_report
 from config import NAIVE_COLLECTION, OPENAI_API_KEY, GEMINI_API_KEY, USE_GEMINI, GEMINI_MODEL, OPENAI_MODEL
 
 
-# ─── Rate Limiter for Free Tier ──────────────────────────
-
-_last_call_time = 0.0
-_min_interval = 4.5  # seconds between calls (15 RPM = 4 sec, add buffer)
-
-
-def _rate_limit():
-    """Enforce minimum interval between API calls."""
-    global _last_call_time
-    elapsed = time.time() - _last_call_time
-    if elapsed < _min_interval:
-        time.sleep(_min_interval - elapsed)
-    _last_call_time = time.time()
-
-
-def _parse_retry_delay(error_msg: str) -> float:
-    """Extract retry delay from error message (e.g., 'Please retry in 22.36s')."""
-    match = re.search(r'retry in\s+([\d.]+)\s*s', error_msg, re.IGNORECASE)
-    if match:
-        return float(match.group(1)) + 1
-    return 0.0
-
-
 def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 400) -> str:
-    """Call LLM (Gemini or OpenAI) with rate limiting and retry logic."""
-    max_retries = 5
-    base_delay = 5.0
-    
-    for attempt in range(max_retries):
-        _rate_limit()
-        
-        if USE_GEMINI and GEMINI_API_KEY:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=GEMINI_API_KEY)
-                model = genai.GenerativeModel(GEMINI_MODEL)
-                full_prompt = f"{system_prompt}\n\n{user_prompt}"
-                response = model.generate_content(
-                    full_prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        max_output_tokens=max_tokens,
-                        temperature=0.1,
-                    )
-                )
-                return response.text.strip()
-            except Exception as e:
-                error_msg = str(e)
-                if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
-                    retry_delay = _parse_retry_delay(error_msg)
-                    if retry_delay == 0:
-                        retry_delay = base_delay * (2 ** attempt)
-                    print(f"  ⏳ Rate limited (attempt {attempt+1}/{max_retries}), waiting {retry_delay:.1f}s...")
-                    time.sleep(retry_delay)
-                    continue
-                print(f"  ⚠️  Gemini call failed: {e}")
-        
-        if OPENAI_API_KEY:
-            try:
-                from openai import OpenAI
-                client = OpenAI()
-                resp = client.chat.completions.create(
-                    model=OPENAI_MODEL,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    max_tokens=max_tokens,
+    """Call LLM (Gemini or OpenAI) with given prompts."""
+    if USE_GEMINI and GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel(GEMINI_MODEL)
+            full_prompt = f"{system_prompt}\n\n{user_prompt}"
+            response = model.generate_content(
+                full_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=max_tokens,
                     temperature=0.1,
                 )
-                return resp.choices[0].message.content.strip()
-            except Exception as e:
-                error_msg = str(e)
-                if "429" in error_msg or "rate" in error_msg.lower():
-                    retry_delay = base_delay * (2 ** attempt)
-                    print(f"  ⏳ Rate limited (attempt {attempt+1}/{max_retries}), waiting {retry_delay:.1f}s...")
-                    time.sleep(retry_delay)
-                    continue
-                print(f"  ⚠️  OpenAI call failed: {e}")
-        
-        break
-    
+            )
+            return response.text.strip()
+        except Exception as e:
+            print(f"  ⚠️  Gemini call failed: {e}")
+
+    if OPENAI_API_KEY:
+        try:
+            from openai import OpenAI
+            client = OpenAI()
+            resp = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=0.1,
+            )
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"  ⚠️  OpenAI call failed: {e}")
+
     return ""
 
 
