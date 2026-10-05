@@ -92,18 +92,18 @@ Dưới đây là 5 trường hợp hệ thống vẫn còn lúng túng hoặc t
 
 ## Case Study (cho presentation)
 
-**Câu hỏi chọn để mổ xẻ:** *"Nhân viên được nghỉ bao nhiêu ngày phép năm?"*
+**Câu hỏi chọn để mổ xẻ:** *"Một nhân viên Senior có 9 năm thâm niên được nghỉ bao nhiêu ngày phép năm?"*
 
 **Lần theo luồng kiểm tra (Error Tree walkthrough):**
-1. **Câu trả lời đúng chưa?** → Chưa chuẩn nếu hệ thống chỉ bảo "12 ngày", Chuẩn khi trả lời "15 ngày theo chính sách 2024 mới nhất".
-2. **Context đưa vào đúng chưa?** → Kiểm tra top 3 đoạn văn bản trả về. Nếu thấy đoạn trích từ bản 2023 nằm đè lên bản 2024 thì biết ngay khâu Retrieval đang bị lỗi bốc nhầm tài liệu cũ.
-3. **Câu hỏi người dùng thế nào?** → Người dùng thường hỏi rất ngắn gọn, không ai ghi thêm chữ "theo quy định năm 2024", làm cả BM25 lẫn Dense Search đều chấm điểm cao cho cả 2 văn bản.
+1. **Câu trả lời đúng chưa?** → Chưa chuẩn nếu hệ thống trả lời "15 ngày" hoặc "16 ngày". Chuẩn khi trả lời "18 ngày (15 ngày cơ bản + 3 ngày thâm niên: cứ 3 năm được cộng 1 ngày)".
+2. **Context đưa vào đúng chưa?** → Kiểm tra top 3 đoạn văn bản. Context thực tế ghi rõ quy tắc "3 năm cộng 1 ngày" nhưng LLM vẫn tính sai → lỗi ở khâu Generation, không phải Retrieval.
+3. **Câu hỏi người dùng thế nào?** → Câu hỏi có tham số số học cụ thể (9 năm thâm niên, Senior) yêu cầu tính toán suy luận, không chỉ lookup.
 4. **Cách khắc phục qua từng khâu:** 
-   - **Khâu Chunking (M1):** Cắt theo cấu trúc Markdown để luôn giữ được dòng tiêu đề `Phiên bản 2024`.
-   - **Khâu Enrichment (M5):** Gắn thẳng thẻ `[Chính sách nghỉ phép 2024 - Đang áp dụng]` vào đầu đoạn văn.
-   - **Khâu Rerank (M3):** Bộ lọc Reranker sẽ nhìn thấy ngữ cảnh phiên bản đang áp dụng và đẩy bản mới lên trước.
+   - **Khâu Generation (Pipeline):** Thêm Chain-of-Thought prompt: "Hãy suy nghĩ từng bước: xác định ngày cơ bản → tính ngày thâm niên → cộng tổng → trả lời".
+   - **Khâu Enrichment (M5):** Trích xuất metadata `seniority_rule: "3 years = 1 day"` để LLM dễ tham chiếu quy tắc thay vì tự suy diễn.
+   - **Khâu Chunking (M1):** Giữ nguyên bảng/công thức tính toán trong chunk, không tách gãy giữa quy tắc và ví dụ.
 
 **Hướng tối ưu mở rộng (nếu có thêm thời gian):**
-- **Thêm bước viết lại câu hỏi (Query Rewrite):** Khi người dùng hỏi ngắn gọn, con bot sẽ tự động chèn thêm ngữ cảnh thời gian (ví dụ: "chính sách mới nhất hiện nay") trước khi đem đi tìm kiếm.
-- **Lọc theo trạng thái tài liệu:** Thêm bộ lọc metadata đơn giản, tài liệu nào cũ thì đánh dấu lưu trữ (archive), chỉ tìm kiếm trong các tài liệu đang có hiệu lực.
-- **Hoàn thiện cơ chế Parent-Child Retrieval:** Khi tìm kiếm thì dùng các mẩu nhỏ (child chunk) cho chính xác và nhanh, nhưng khi gửi cho LLM trả lời thì lấy nguyên cả đoạn văn lớn (parent chunk) xung quanh để đảm bảo không bị thiếu thông tin.
+- **Program-aided Generation:** Cho LLM sinh code Python tính toán thay vì tự làm toán → loại bỏ hallucination số học.
+- **Structured Output Validation:** Regex guardrail kiểm tra format "X ngày (Y cơ bản + Z thâm niên)" trước khi trả user.
+- **Few-shot CoT Examples:** Thêm 2-3 ví dụ tính thâm niên khác nhau vào prompt để LLM học pattern.
